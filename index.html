@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELEKTRİKLİ ARAÇ SARJ İSTASYON HARİTASI</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; background-color: #e5e9ec; }
+        #harita { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        
+        .leaflet-marker-shadow { display: none !important; }
+        .custom-svg-icon { background: none; border: none; }
+
+        /* =======================================================
+           YENİ: ALT BİLGİ VE ÖLÇEK (ATTRIBUTION & SCALE) TASARIMI
+           ======================================================= */
+        .leaflet-control-attribution {
+            background-color: rgba(255, 255, 255, 0.85) !important;
+            color: #444 !important; font-size: 11px !important; border-top-left-radius: 6px;
+            padding: 4px 8px !important; box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .leaflet-control-attribution a { color: #5f27cd !important; font-weight: 600; text-decoration: none; cursor: pointer; }
+        .leaflet-control-attribution a:hover { text-decoration: underline; }
+        
+        .leaflet-control-scale-line {
+            border: 2px solid #444 !important; border-top: none !important; color: #222 !important;
+            background: rgba(255, 255, 255, 0.7) !important; font-weight: 700; font-size: 11px !important;
+            text-shadow: 1px 1px 0px #fff; padding: 2px 5px 1px !important;
+        }
+
+        #sagUstButonlar { position: absolute; z-index: 1000; top: 20px; right: 20px; display: flex; gap: 15px; }
+        #konumBulBtn, #menuBtn {
+            background: white; border: none; border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; transition: all 0.3s ease; color: #333333; 
+        }
+        #menuBtn { background: #333333; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        #konumBulBtn:hover { background: #fdfdfd; transform: scale(1.05); color: #5f27cd; box-shadow: 0 6px 15px rgba(95, 39, 205, 0.3); }
+        #menuBtn:hover { background: #444444; transform: scale(1.05); box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6); }
+
+        #sol-panel { 
+            position: absolute; top: 20px; left: 0; max-height: calc(100vh - 40px); width: 320px; 
+            background-color: #333333; z-index: 1001; padding: 25px 20px; box-sizing: border-box; 
+            border-top-right-radius: 20px; border-bottom-right-radius: 20px;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 15px;
+            transform: translateX(-100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sol-panel.acik { transform: translateX(0); }
+
+        #filtreTab {
+            position: absolute; top: 50px; right: -45px; width: 45px; height: 140px; background-color: #333333; 
+            border-top-right-radius: 15px; border-bottom-right-radius: 15px; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; box-shadow: 5px 0 10px rgba(0,0,0,0.2);
+        }
+        .filtre-yazi { color: white; font-weight: 900; letter-spacing: 3px; font-size: 1.2em; transform: rotate(90deg); user-select: none; }
+
+        .filtre-grubu { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; color: #f1f2f6; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+        select, input[type="number"] { 
+            padding: 12px; border: none; border-bottom: 2px solid #555; border-radius: 8px; outline: none; 
+            background-color: #444444; color: white; font-size: 0.95em; width: 100%; box-sizing: border-box; transition: 0.2s; appearance: none; 
+        }
+        select:focus, input[type="number"]:focus { border-bottom-color: #3498db; background-color: #4a4a4a; }
+        .guc-kutu-container { display: flex; gap: 10px; align-items: center; }
+        .guc-kutu-container label { display: flex; align-items: center; gap: 5px; width: 50%; }
+        .guc-kutu-container input { border-radius: 20px; text-align: center; padding: 10px; }
+
+        .buton-grubu { display: flex; justify-content: center; margin-top: 15px; }
+        #uygulaBtn {
+            width: 85%; padding: 14px; border: none; border-radius: 25px; font-size: 1.1em; font-weight: bold; letter-spacing: 1px;
+            cursor: pointer; transition: all 0.3s ease; color: white; background-color: #5f27cd; box-shadow: 0 4px 15px rgba(95, 39, 205, 0.3);
+        }
+        #uygulaBtn:hover { background-color: #481ea3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(95, 39, 205, 0.5); }
+        #sonuc-bilgisi { background: #444; color: #ddd; padding: 10px; border-radius: 12px; text-align: center; font-weight: bold; font-size: 0.9em; }
+
+        #devPopupOverlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); z-index: 9999;
+            display: none; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;
+        }
+        #devPopupOverlay.goster { display: flex; opacity: 1; }
+        #devPopupContent { background-color: #333333; padding: 40px; border-radius: 20px; position: relative; box-shadow: 0 15px 40px rgba(0,0,0,0.5); transform: scale(0.9); transition: transform 0.3s ease; max-width: 400px; text-align: center; }
+        #devPopupOverlay.goster #devPopupContent { transform: scale(1); }
+        #devPopupInner { background-color: #555555; padding: 30px 50px; border-radius: 15px; text-align: center; color: white; display: flex; flex-direction: column; gap: 10px; }
+        #devPopupInner .baslik { font-size: 1.1em; color: #dddddd; }
+        #devPopupInner .isim { font-size: 1.4em; font-weight: bold; letter-spacing: 1px; color: #5f27cd; }
+        #devPopupInner .metin { font-size: 0.95em; color: #f1f2f6; line-height: 1.5; }
+        #kapatPopupBtn {
+            position: absolute; top: -15px; right: -15px; width: 45px; height: 45px; background-color: #444444; border: 3px solid #333333;
+            border-radius: 12px; color: white; font-size: 1.5em; font-weight: bold; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        #kapatPopupBtn:hover { background-color: #ff4757; transform: scale(1.1); }
+
+        .leaflet-popup-content-wrapper { background: #333333 !important; color: #f1f2f6 !important; border-radius: 18px !important; padding: 0 !important; box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important; overflow: hidden; }
+        .leaflet-popup-tip { background: #333333 !important; }
+        .leaflet-popup-content { margin: 0 !important; width: 260px !important; }
+        .leaflet-popup-close-button { color: #ffffff !important; top: 10px !important; right: 10px !important; font-size: 18px !important; font-weight: bold !important; }
+        .leaflet-popup-close-button:hover { color: #ff4757 !important; }
+        .custom-popup { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .popup-operator { background: #4a4a4a; border-radius: 12px; padding: 10px 15px; font-weight: bold; font-size: 1.05em; letter-spacing: 1px; color: #ffffff; margin-right: 15px; }
+        .popup-operator span { color: #2ed573; }
+        .popup-details { display: flex; flex-direction: column; gap: 8px; }
+        .popup-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 5px; font-size: 0.95em; }
+        .popup-label { font-weight: 500; color: #cccccc; }
+        .popup-value { font-weight: bold; color: #ffffff; text-align: right; }
+        .popup-nav-btn { background-color: #5f27cd; color: white !important; text-decoration: none; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border-radius: 25px; font-weight: bold; font-size: 1.05em; letter-spacing: 1px; transition: 0.3s; margin-top: 5px; box-shadow: 0 4px 15px rgba(95, 39, 205, 0.4); }
+        .popup-nav-btn:hover { background-color: #481ea3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(95, 39, 205, 0.6); }
+        .nav-icon-circle { background: white; color: #5f27cd; width: 26px; height: 26px; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .nav-icon-circle svg { width: 14px; height: 14px; fill: currentColor; transform: rotate(45deg); }
+
+        .gps-pulse-marker { width: 18px; height: 18px; background-color: #3498db; border: 3px solid white; border-radius: 50%; position: relative; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: translate(-50%, -50%); }
+        .gps-pulse-marker::after { content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background-color: rgba(52, 152, 219, 0.5); border-radius: 50%; z-index: -1; animation: radarPulse 2s ease-out infinite; }
+        @keyframes radarPulse { 0% { width: 100%; height: 100%; opacity: 1; } 100% { width: 350%; height: 350%; opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="sagUstButonlar">
+        <button id="konumBulBtn" title="Konumumu Bul">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="6"></circle>
+                <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                <line x1="12" y1="2" x2="12" y2="6"></line>
+                <line x1="12" y1="18" x2="12" y2="22"></line>
+                <line x1="2" y1="12" x2="6" y2="12"></line>
+                <line x1="18" y1="12" x2="22" y2="12"></line>
+            </svg>
+        </button>
+        <button id="menuBtn" title="Geliştirici Bilgisi" onclick="popupGoster('GELİŞTİRİCİ', 'ABDURRAHMAN AKDENİZ', '')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <circle cx="12" cy="5" r="2.5"></circle>
+                <circle cx="12" cy="12" r="2.5"></circle>
+                <circle cx="12" cy="19" r="2.5"></circle>
+            </svg>
+        </button>
+    </div>
+
+    <div id="devPopupOverlay">
+        <div id="devPopupContent">
+            <button id="kapatPopupBtn">X</button>
+            <div id="devPopupInner">
+                <span class="baslik" id="popupBaslik">prepared by</span>
+                <span class="isim" id="popupIsim">ABDURRAHMAN AKDENİZ</span>
+                <span class="metin" id="popupMetin" style="display:none;"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="sol-panel">
+        <div id="filtreTab">
+            <span class="filtre-yazi">FİLTRE</span>
+        </div>
+        <div class="filtre-grubu"><label for="ulkeFiltresi">ÜLKE</label><select id="ulkeFiltresi"><option value="Tümü">Tümü</option></select></div>
+        <div class="filtre-grubu"><label for="sehirFiltresi">ŞEHİR</label><select id="sehirFiltresi"><option value="Tümü">Tümü</option></select></div>
+        <div class="filtre-grubu"><label for="akimFiltresi">AKIM TÜRÜ</label><select id="akimFiltresi"><option value="Tümü">Tümü</option><option value="AC">AC</option><option value="DC">DC</option><option value="ACDC">AC/DC</option></select></div>
+        <div class="filtre-grubu"><label for="markaFiltresi">OPERATÖR</label><select id="markaFiltresi"><option value="Tümü">Tümü</option></select></div>
+        <div class="filtre-grubu"><label>ŞARJ GÜCÜ</label><div class="guc-kutu-container"><label>MİN <input type="number" id="minGuc" placeholder="0" min="0"></label><label>MAX <input type="number" id="maxGuc" placeholder="350" min="0"></label></div></div>
+        <div class="buton-grubu"><button id="uygulaBtn">UYGULA</button></div>
+        <div id="sonuc-bilgisi">Hazırlanıyor...</div>
+    </div>
+
+    <div id="harita"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="veriler.js"></script>
+
+    <script>
+        // =======================================================
+        // YENİ: ATTRIBUTION (ALT BİLGİ) VE SCALE (ÖLÇEK) AKTİF
+        // =======================================================
+        const map = L.map('harita', { zoomControl: false, attributionControl: true }).setView([41.012, 28.976], 10);
+        
+        // Leaflet'in varsayılan ön ekini siliyoruz ki daha temiz görünsün
+        map.attributionControl.setPrefix(false);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Ölçek Çubuğunu Ekle (Sağ Alt)
+        L.control.scale({ metric: true, imperial: false, position: 'bottomright' }).addTo(map);
+
+        // Kendi Özelleştirilmiş Telif ve Bilgi Yazılarımız
+        const ozelAltBilgi = `Veriler © <a href="https://openchargemap.org/" target="_blank">OpenChargeMap</a> | Harita: © <a href="https://carto.com/" target="_blank">CARTO</a>, <a href="https://www.openstreetmap.org/copyright" target="_blank">OSM</a> | <a href="https://leafletjs.com/" target="_blank">Leaflet</a>`;
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
+            maxZoom: 20, 
+            attribution: ozelAltBilgi 
+        }).addTo(map);
+
+        let isaretciKatmani = L.layerGroup().addTo(map);
+        let userMarker; 
+
+        const svgPinCode = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="30" height="45">
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.4"/>
+                </filter>
+                <g filter="url(#shadow)">
+                    <path d="M20,2 C8,2 2,11 2,21 C2,34 20,58 20,58 C20,58 38,34 38,21 C38,11 32,2 20,2 Z" fill="#5f27cd" />
+                    <circle cx="20" cy="20" r="8" fill="#ffffff" />
+                </g>
+            </svg>
+        `;
+
+        const customIcon = L.divIcon({
+            className: 'custom-svg-icon', html: svgPinCode, iconSize: [30, 45], iconAnchor: [15, 45], popupAnchor: [0, -40]
+        });
+
+        // POPUP YÖNETİMİ
+        const popupOverlay = document.getElementById('devPopupOverlay');
+        const kapatPopupBtn = document.getElementById('kapatPopupBtn');
+        const popupBaslik = document.getElementById('popupBaslik');
+        const popupIsim = document.getElementById('popupIsim');
+        const popupMetin = document.getElementById('popupMetin');
+
+        function popupGoster(baslik, isim, metin) {
+            popupBaslik.innerText = baslik;
+            popupIsim.innerText = isim;
+            if(metin) {
+                popupMetin.innerText = metin;
+                popupMetin.style.display = 'block';
+            } else {
+                popupMetin.style.display = 'none';
+            }
+            popupOverlay.classList.add('goster');
+        }
+
+        kapatPopupBtn.addEventListener('click', () => { popupOverlay.classList.remove('goster'); });
+        popupOverlay.addEventListener('click', (e) => { if (e.target === popupOverlay) popupOverlay.classList.remove('goster'); });
+
+        const solPanel = document.getElementById('sol-panel');
+        document.getElementById('filtreTab').addEventListener('click', () => { solPanel.classList.toggle('acik'); });
+
+        const ulkeFiltresi = document.getElementById('ulkeFiltresi');
+        const sehirFiltresi = document.getElementById('sehirFiltresi');
+        const markaFiltresi = document.getElementById('markaFiltresi'); 
+        
+        const lokasyonVerileri = {}; 
+        const tumMarkalar = new Set(); 
+
+        istasyonVerileri.forEach(ist => {
+            if (!lokasyonVerileri[ist.ulke]) lokasyonVerileri[ist.ulke] = new Set();
+            if (ist.sehir !== "BILINMIYOR" && ist.sehir !== "") lokasyonVerileri[ist.ulke].add(ist.sehir);
+            if (ist.marka && ist.marka !== "Bilinmeyen Operatör") tumMarkalar.add(ist.marka);
+        });
+
+        Object.keys(lokasyonVerileri).sort().forEach(ulkeAdi => {
+            const opt = document.createElement('option'); opt.value = ulkeAdi; opt.innerText = ulkeAdi; ulkeFiltresi.appendChild(opt);
+        });
+
+        Array.from(tumMarkalar).sort().forEach(marka => {
+            const opt = document.createElement('option'); opt.value = marka; opt.innerText = marka; markaFiltresi.appendChild(opt);
+        });
+
+        function sehirleriDoldur(seciliUlke) {
+            sehirFiltresi.innerHTML = '<option value="Tümü">Tümü</option>';
+            if (seciliUlke !== "Tümü" && lokasyonVerileri[seciliUlke]) {
+                Array.from(lokasyonVerileri[seciliUlke]).sort().forEach(sehirAdi => {
+                    const opt = document.createElement('option'); opt.value = sehirAdi; opt.innerText = sehirAdi; sehirFiltresi.appendChild(opt);
+                });
+            }
+        }
+        ulkeFiltresi.addEventListener('change', () => { sehirleriDoldur(ulkeFiltresi.value); });
+
+        function baslangicAyarlariniYap() {
+            const trSecenek = Array.from(ulkeFiltresi.options).find(opt => opt.value.toUpperCase().includes("TUR") || opt.value.toUpperCase().includes("TÜRK"));
+            if(trSecenek) {
+                ulkeFiltresi.value = trSecenek.value; sehirleriDoldur(trSecenek.value);
+                const istSecenek = Array.from(sehirFiltresi.options).find(opt => opt.value.toUpperCase().includes("ISTANBUL") || opt.value.toUpperCase().includes("İSTANBUL"));
+                if(istSecenek) sehirFiltresi.value = istSecenek.value;
+            }
+            
+            haritayiGuncelle(false); 
+            map.setView([41.012, 28.976], 10);
+            setTimeout(() => { map.locate({ setView: false, maxZoom: 14, enableHighAccuracy: true }); }, 1000);
+        }
+
+        map.on('locationfound', function(e) {
+            if (userMarker) map.removeLayer(userMarker);
+            const userIcon = L.divIcon({ className: 'gps-pulse-marker', iconSize: [20, 20] });
+            userMarker = L.marker(e.latlng, { icon: userIcon }).addTo(map);
+            
+            let enYakinMesafe = Infinity;
+            let enYakinIstasyon = null;
+
+            istasyonVerileri.forEach(ist => {
+                if (ist.sehir && ist.sehir !== "BİLİNMİYOR" && ist.sehir.trim() !== "") {
+                    let mesafe = map.distance(e.latlng, ist.koordinat);
+                    if (mesafe < enYakinMesafe) {
+                        enYakinMesafe = mesafe; 
+                        enYakinIstasyon = ist;
+                    }
+                }
+            });
+
+            if (enYakinIstasyon) {
+                ulkeFiltresi.value = enYakinIstasyon.ulke;
+                sehirleriDoldur(enYakinIstasyon.ulke);
+                
+                let sehirSecenekleri = Array.from(sehirFiltresi.options).map(opt => opt.value);
+                if (sehirSecenekleri.includes(enYakinIstasyon.sehir)) {
+                    sehirFiltresi.value = enYakinIstasyon.sehir;
+                } else {
+                    sehirFiltresi.value = "Tümü";
+                }
+                
+                haritayiGuncelle(false); 
+            }
+            map.flyTo(e.latlng, 12, { duration: 1.5 });
+        });
+
+        map.on('locationerror', function(e) { console.log("Konum izni verilmedi: " + e.message); });
+
+        document.getElementById('konumBulBtn').addEventListener('click', () => { map.locate({ setView: false, maxZoom: 14, enableHighAccuracy: true }); });
+        document.getElementById('uygulaBtn').addEventListener('click', () => { haritayiGuncelle(true); if(window.innerWidth < 768) solPanel.classList.remove('acik'); });
+
+        function haritayiGuncelle(odaklan = false) {
+            isaretciKatmani.clearLayers();
+            const seciliUlke = ulkeFiltresi.value; const seciliSehir = sehirFiltresi.value;
+            const seciliAkim = document.getElementById('akimFiltresi').value; const seciliMarka = document.getElementById('markaFiltresi').value;
+            const fMin = parseInt(document.getElementById('minGuc').value) || 0; 
+            const fMax = parseInt(document.getElementById('maxGuc').value) || 999;
+            let sayi = 0; let sinirlar = L.latLngBounds();
+
+            istasyonVerileri.forEach(ist => {
+                const guc = parseInt(ist.ozellikler.guc.replace(/\D/g, ''));
+                const tur = ist.ozellikler.akimTuru.toUpperCase();
+                
+                if ((seciliUlke === "Tümü" || ist.ulke === seciliUlke) && (seciliSehir === "Tümü" || ist.sehir === seciliSehir) && (seciliMarka === "Tümü" || ist.marka.includes(seciliMarka)) && (guc >= fMin && guc <= fMax)) {
+                    let akimUygun = (seciliAkim === "Tümü") || (seciliAkim === "AC" && tur.includes("AC") && !tur.includes("DC")) || (seciliAkim === "DC" && tur.includes("DC") && !tur.includes("AC")) || (seciliAkim === "ACDC" && tur.includes("AC") && tur.includes("DC"));
+                    if (akimUygun) {
+                        sayi++;
+                        sinirlar.extend(ist.koordinat);
+                        const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${ist.koordinat[0]},${ist.koordinat[1]}`;
+                        
+                        const popupHTML = `
+                            <div class="custom-popup">
+                                <div class="popup-operator">OPERATÖR: <span>${ist.marka}</span></div>
+                                <div class="popup-details">
+                                    <div class="popup-row"><span class="popup-label">Bölge</span><span class="popup-value">${ist.sehir}</span></div>
+                                    <div class="popup-row"><span class="popup-label">Güç</span><span class="popup-value">${ist.ozellikler.guc}</span></div>
+                                    <div class="popup-row"><span class="popup-label">Tür</span><span class="popup-value">${ist.ozellikler.akimTuru}</span></div>
+                                    <div class="popup-row"><span class="popup-label">Soket Tipi</span><span class="popup-value">${ist.ozellikler.konnektor}</span></div>
+                                    <div class="popup-row"><span class="popup-label">Nokta Sayısı</span><span class="popup-value">${ist.ozellikler.noktaSayisi} Adet</span></div>
+                                </div>
+                                <a href="${navUrl}" target="_blank" class="popup-nav-btn">
+                                    YOL TARİFİ AL
+                                    <div class="nav-icon-circle"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg></div>
+                                </a>
+                            </div>
+                        `;
+                        L.marker(ist.koordinat, { icon: customIcon }).addTo(isaretciKatmani).bindPopup(popupHTML);
+                    }
+                }
+            });
+            document.getElementById('sonuc-bilgisi').innerText = sayi === 0 ? "İstasyon bulunamadı!" : `${sayi} İstasyon Gösterildi`;
+            
+            if (odaklan && sayi > 0) map.fitBounds(sinirlar, { padding: [50, 50], maxZoom: 12, duration: 1.5 });
+        }
+        
+        baslangicAyarlariniYap(); 
+    </script>
+</body>
+</html>
