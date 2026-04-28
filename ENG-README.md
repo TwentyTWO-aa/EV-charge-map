@@ -21,8 +21,11 @@ Paste the API key into the required place on the fourth line of the veri-botu.js
 -Clone the project files to your computer or download them as a ZIP file:
 
 -Place the index.html, data-bot.js, and data.js files into a folder.
+
 -Open a PowerShell window in the folder and type "npm install" and press enter.
+
 -To run the veri-botu.js file, type "node veri-botu.js" in the PowerShell window that you opened in the folder and press enter.
+
 -All the data will be retrieved and filtered in approximately 1-2 minutes and all the data will be in the veriler.js file.
 
 #### RUN
