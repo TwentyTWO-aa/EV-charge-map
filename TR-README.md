@@ -20,9 +20,13 @@ Sistem iki parçadan oluşur: Verileri çekip coğrafi hataları düzelten akıl
 
 ##### 3. Projeyi İndirin
 -Projeyi dosyalarını bilgisayarınıza klonlayın veya ZIP olarak indirin:   
+
 -index.html , veri-botu.js , veriler.js dosyalarını bir kalasörün içine koyun.
+
 -Klasör içinde PoweShell penceresini açın ve "npm install @turf/turf" yazıp enter bas
+
 -veri-botu.js dosyasını çalıştırmak için yine klasör içinde açtığımız PowerShell de "node veri-botu.js" yazıp enter bas
+
 -Tüm verileri yaklaşık 1-2 dakika içinde çekip filtreleyerek veriler .js dosyasının içine tüm veriler gelmiş olacak 
 
 #### ÇALIŞTIR
